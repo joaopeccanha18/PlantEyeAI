@@ -8,12 +8,13 @@ interface HistoryViewProps {
   history: HistoryItem[];
   onClearHistory: () => void;
   onDeleteItem: (id: string) => void;
+  onMarkRemoved: (id: string) => void;
 }
 
 type StatusFilter = 'ALL' | PlantStatus;
 type DateFilter = 'ALL' | 'TODAY' | 'WEEK' | 'MONTH';
 
-const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDeleteItem }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDeleteItem, onMarkRemoved }) => {
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
@@ -26,7 +27,9 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
     }).format(new Date(timestamp));
   };
 
-  const translateStatus = (status: string) => {
+  const translateStatus = (status: string, healthStatus?: string) => {
+    // Preferir o novo healthStatus RAIZ
+    if (healthStatus) return healthStatus;
     switch (status?.toUpperCase()) {
       case 'HEALTHY': return 'Saudável';
       case 'THIRSTY': return 'Deficit Hídrico';
@@ -35,12 +38,14 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toUpperCase()) {
-      case 'HEALTHY': return 'text-emerald-700 bg-emerald-100';
-      case 'THIRSTY': return 'text-amber-700 bg-amber-100';
-      case 'SICK': return 'text-rose-700 bg-rose-100';
-      default: return 'text-gray-700 bg-gray-100';
+  const getStatusColor = (status: string, healthStatus?: string) => {
+    const hs = healthStatus ?? status;
+    switch (hs) {
+      case 'Saudável': case 'HEALTHY':  return 'text-emerald-700 bg-emerald-100';
+      case 'Em Stress': case 'THIRSTY': return 'text-amber-700 bg-amber-100';
+      case 'Doente':  case 'SICK':     return 'text-orange-700 bg-orange-100';
+      case 'Crítico':                  return 'text-red-700 bg-red-100';
+      default:                         return 'text-gray-700 bg-gray-100';
     }
   };
 
@@ -189,12 +194,19 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
           {filteredHistory.map((item) => (
             <div
               key={item.id}
-              className="bg-white rounded-[2rem] p-4 flex gap-4 items-center border border-emerald-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
+              className={`bg-white rounded-[2rem] p-4 flex gap-4 items-center border shadow-sm hover:shadow-md transition-shadow cursor-pointer group ${item.isInvasive && !item.removedAt ? 'border-purple-200' : 'border-emerald-100'}`}
               onClick={() => setSelectedItem(item)}
             >
-              <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-emerald-50">
+              <div className={`w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 border-2 ${item.isInvasive && !item.removedAt ? 'border-purple-200' : 'border-emerald-50'} relative`}>
                 {item.imageUrl ? (
-                  <img src={item.imageUrl} alt={item.species} className="w-full h-full object-cover" />
+                  <>
+                    <img src={item.imageUrl} alt={item.species} className="w-full h-full object-cover" />
+                    {item.isInvasive && !item.removedAt && (
+                      <div className="absolute inset-0 bg-purple-500/15 flex items-end justify-center pb-1">
+                        <span className="text-[8px] font-black text-purple-700 bg-white/80 px-1 rounded">⚠</span>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="w-full h-full bg-emerald-100 flex items-center justify-center">
                     <Leaf className="w-6 h-6 text-emerald-500" />
@@ -203,12 +215,41 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
               </div>
 
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-[#064E3B] truncate">{item.species}</h3>
+                <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                  <span className="text-[9px] font-black text-emerald-400/60 bg-emerald-50 px-1.5 py-0.5 rounded-full uppercase tracking-widest">
+                    #{String(item.analysisId ?? 0).padStart(3, '0')}
+                  </span>
+                  {item.coords && <span className="text-[9px] text-emerald-400/50 font-medium">📍 GPS</span>}
+                  {/* Badge Invasora */}
+                  {item.isInvasive && !item.removedAt && (
+                    <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-full">⚠ INVASORA</span>
+                  )}
+                  {item.isInvasive && item.removedAt && (
+                    <span className="text-[9px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">✅ Removida</span>
+                  )}
+                  {!item.isInvasive && item.threatDetected && item.threatDetected !== 'nenhuma' && (
+                    <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">
+                      🐛 {item.severityLevel !== undefined ? `Nv.${item.severityLevel} ` : ''}{item.threatDetected.replace('_', ' ')}
+                    </span>
+                  )}
+                </div>
+                <h3 className="font-bold text-[#064E3B] truncate italic">
+                  {item.isInvasive ? (item.invasiveSpecies || item.species) : item.species}
+                </h3>
                 <p className="text-xs text-emerald-600/70 mt-0.5">{formatDate(item.timestamp)}</p>
-                <p className="text-[10px] text-emerald-500/60 font-medium mt-0.5 uppercase tracking-widest">Eucalyptus spp.</p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Botão "Marcar como Removida" — só para invasoras não removidas */}
+                {item.isInvasive && !item.removedAt && (
+                  <button
+                    onClick={e => { e.stopPropagation(); onMarkRemoved(item.id); }}
+                    className="p-1.5 rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors"
+                    title="Marcar invasora como removida"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
                 <button
                   onClick={e => { e.stopPropagation(); exportSinglePDF(item); }}
                   className="p-1.5 rounded-full bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
@@ -216,9 +257,15 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
                 >
                   <FileDown className="w-4 h-4" />
                 </button>
-                <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full ${getStatusColor(item.status)}`}>
-                  {translateStatus(item.status)}
-                </span>
+                {item.isInvasive ? (
+                  <span className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full text-purple-700 bg-purple-100">
+                    {item.removedAt ? 'Removida' : 'Invasora'}
+                  </span>
+                ) : (
+                  <span className={`px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-full ${getStatusColor(item.status, item.healthStatus)}`}>
+                    {translateStatus(item.status, item.healthStatus)}
+                  </span>
+                )}
                 <ChevronRight className="w-5 h-5 text-emerald-200 group-hover:text-emerald-400 transition-colors" />
               </div>
             </div>

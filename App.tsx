@@ -14,6 +14,7 @@ import AuthModal from './components/AuthModal';
 import QuotaAlert from './components/QuotaAlert';
 import Estatistica from './components/estatistica';
 import SettingsModal, { translations, Language } from './components/SettingsModal';
+import MapView from './components/MapView';
 
 import { useHistory } from './hooks/useHistory';
 import { useOfflineSync } from './hooks/useOfflineSync';
@@ -22,11 +23,10 @@ import { useQuotaAlert } from './hooks/useQuotaAlert';
 
 import {
   saveDiagnosticoPendente,
-  getCurrentPosition,
   generateLocalId,
 } from './services/offlineDB';
 
-import { AnalysisResult } from './types';
+import { AnalysisResult, GpsCoords, HistoryItem } from './types';
 
 type ActiveTab = 'scan' | 'live' | 'history' | 'map' | 'stats';
 
@@ -39,24 +39,32 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [language, setLanguage] = useState<Language>('pt');
+  const [mapSelectedItem, setMapSelectedItem] = useState<HistoryItem | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(
+    () => !localStorage.getItem('planteye_raiz_onboarding_seen')
+  );
+
+  const dismissOnboarding = () => {
+    localStorage.setItem('planteye_raiz_onboarding_seen', '1');
+    setShowOnboarding(false);
+  };
 
   const t = translations[language];
 
   const { session, loading, signIn, signUp, signOut } = useAuth();
-  const { history, addHistoryItem, clearHistory, deleteHistoryItem } = useHistory(session);
+  const { history, addHistoryItem, clearHistory, deleteHistoryItem, markInvasiveRemoved } = useHistory(session);
   const { isOnline, pendingCount, isSyncing } = useOfflineSync();
   const { quotaAlert, dismissQuotaAlert, handleGeminiError } = useQuotaAlert();
 
   const handleCapture = useCallback(
-    async (result: AnalysisResult, imageDataUrl: string) => {
+    async (result: AnalysisResult, imageDataUrl: string, coords: GpsCoords | null) => {
       setAnalysisResult(result);
       setCapturedImage(imageDataUrl);
-      addHistoryItem(result, imageDataUrl);
+      addHistoryItem(result, imageDataUrl, coords);
 
       try {
         const res = await fetch(imageDataUrl);
         const blob = await res.blob();
-        const coords = await getCurrentPosition();
         const uid = session?.user?.id ?? 'anonimo';
 
         await saveDiagnosticoPendente({
@@ -72,6 +80,12 @@ function App() {
     },
     [addHistoryItem, session]
   );
+
+  /** Navega para o histórico e abre o modal do item selecionado (vindo do mapa) */
+  const handleMapSelectItem = useCallback((item: HistoryItem) => {
+    setMapSelectedItem(item);
+    setActiveTab('history');
+  }, []);
 
   if (loading) {
     return (
@@ -189,7 +203,7 @@ function App() {
               isActive={activeTab === 'live'}
               deviceId={selectedDeviceId}
               onGeminiError={handleGeminiError}
-              onSessionEnd={handleCapture}
+              onSessionEnd={(result, image) => handleCapture(result, image, null)}
             />
           </div>
         )}
@@ -199,14 +213,12 @@ function App() {
             history={history}
             onClearHistory={clearHistory}
             onDeleteItem={deleteHistoryItem}
+            onMarkRemoved={markInvasiveRemoved}
           />
         )}
 
         {activeTab === 'map' && (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-emerald-400">
-            <Map className="w-12 h-12" />
-            <p className="text-sm font-medium">{t.mapSoon}</p>
-          </div>
+          <MapView history={history} onSelectItem={handleMapSelectItem} />
         )}
 
          {/* coisa estatistica */}
@@ -242,6 +254,63 @@ function App() {
       </nav>
 
       {!session && <AuthModal onSignIn={signIn} onSignUp={signUp} />}
+
+      {/* Onboarding RAIZ — aparece apenas na primeira visita */}
+      {showOnboarding && session && (
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl">
+            {/* Header verde */}
+            <div className="bg-[#064E3B] p-8 text-white text-center">
+              <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/20">
+                <Leaf className="w-8 h-8 text-emerald-300 fill-current" />
+              </div>
+              <h2 className="text-2xl font-black tracking-tighter">PlantEye</h2>
+              <p className="text-emerald-300 text-sm font-bold mt-1">Diagnóstico Florestal por IA</p>
+            </div>
+
+            <div className="p-8 space-y-5">
+              <div className="text-center">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/50 mb-2">Base Científica</p>
+                <p className="text-lg font-black text-[#064E3B] leading-tight">
+                  RAIZ – Instituto de Investigação<br />da Floresta e Papel
+                </p>
+                <p className="text-sm text-emerald-600/70 mt-1">Aveiro, Portugal · raiz-iifp.pt</p>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { emoji: '🌿', text: 'Especializado em Eucalyptus globulus · A espécie mais importante da floresta portuguesa' },
+                  { emoji: '🔬', text: 'Mais de 20 anos de investigação em silvicultura · Programa de melhoramento genético clonal (+40% produtividade)' },
+                  { emoji: '🐛', text: 'Deteção de Gonipterus, Phoracantha, Mycosphaerella e deficiências nutricionais com escala de severidade RAIZ/BIOND' },
+                  { emoji: '✅', text: 'Áreas certificadas FSC e PEFC · Projeto e-globulus (Compete 2020)' },
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-3 p-3 bg-emerald-50 rounded-2xl border border-emerald-100">
+                    <span className="text-lg flex-shrink-0">{item.emoji}</span>
+                    <p className="text-xs text-emerald-800 leading-relaxed font-medium">{item.text}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <a
+                  href="https://e-globulus.pt"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 py-3 border-2 border-[#064E3B] text-[#064E3B] rounded-2xl font-bold text-sm text-center hover:bg-emerald-50 transition-colors"
+                >
+                  e-globulus.pt
+                </a>
+                <button
+                  onClick={dismissOnboarding}
+                  className="flex-2 flex-1 py-3 bg-[#064E3B] text-white rounded-2xl font-bold text-sm hover:bg-emerald-800 transition-colors shadow-lg"
+                >
+                  Começar Diagnóstico →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showSettings && (
         <SettingsModal

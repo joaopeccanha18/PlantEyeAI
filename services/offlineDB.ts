@@ -16,7 +16,7 @@ const STORE_NAME = 'diagnosticos_pendentes';
 export interface GpsCoords {
   latitude: number;
   longitude: number;
-  accuracy: number;
+  accuracy?: number;
 }
 
 export type DiagnosticoStatus = 'pendente' | 'sincronizando' | 'sincronizado' | 'erro';
