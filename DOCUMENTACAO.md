@@ -301,6 +301,22 @@ CREATE INDEX IF NOT EXISTS idx_scan_history_invasoras
 
 ---
 
+### Fase 11 — Resiliência Offline e PWA Avançada
+
+**Implementado:**
+- **Captura sem rede inteligente:** Ao capturar foto offline, cria um "Diagnóstico Pendente" que guarda as coordenadas GPS e a imagem em `base64` localmente no IndexedDB.
+- **Re-análise sob demanda:** No `HistoryView`, itens pendentes ganham um botão "Analisar" assim que há internet (acionando a API Gemini tardiamente e sincronizando o resultado final via `updateHistoryItem`).
+- **Layout Mobile-First:**
+  - Header compacto e bottom nav bar fixa em ecrãs móveis.
+  - Suporte para `safe-area-inset-bottom` em dispositivos iOS (notch e barra inferior).
+- **UX do Mapa:**
+  - Fix do conflito de scroll: o mapa ganhou `touchAction: 'none'` e passou a ocupar 100% do ecrã visível (`h-[calc(100dvh-8rem)]`) quando o tab está ativo.
+- **Instalação PWA Nativa:**
+  - Criação da pasta `public/` com ícones específicos (`192x192`, `512x512` e `apple-touch-icon`).
+  - Configuração rigorosa no `vite.config.ts` com `theme_color`, `shortcuts` e `categories` para ativar banners de instalação no Chrome Android e Web Apps no iOS Safari.
+
+---
+
 ## Base de Dados
 
 ### Tabela `scan_history` (Supabase)
@@ -329,6 +345,7 @@ CREATE INDEX IF NOT EXISTS idx_scan_history_invasoras
 | `is_invasive` | BOOLEAN | true se espécie invasora |
 | `invasive_species` | TEXT | Nome científico da invasora |
 | `removed_at` | TIMESTAMPTZ | Quando foi marcada como removida |
+| *(campos locais)* | BOOLEAN / TEXT | Na cache local, suporta `isPending` e `imageBase64` |
 
 **Row Level Security (RLS):** cada utilizador só vê e edita os seus próprios registos.
 
@@ -390,3 +407,5 @@ VITE_GEMINI_API_KEY_3=AIzaSy...   # opcional
 | 20 | Internacionalização PT / EN | ✅ |
 | 21 | Onboarding RAIZ na primeira visita | ✅ |
 | 22 | ID sequencial por análise (#001, #002…) | ✅ |
+| 23 | Re-análise sob demanda (offline to online) com persistência Base64 | ✅ |
+| 24 | App instalável (Mobile-First) com atalhos de sistema e suporte a safe-areas | ✅ |

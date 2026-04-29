@@ -50,6 +50,7 @@ Acacia dealbata, A. melanoxylon, A. longifolia, Hakea sericea, H. salicifolia, P
 
 - **Pins coloridos** por estado: 🟢 Saudável · 🟡 Em Stress · 🔴 Doente · 🟣 Invasora · ⚫ Removida
 - Cada análise com GPS regista automaticamente um pin
+- Interface otimizada (full-screen mobile) sem conflitos de scroll (touch-action)
 - Popup com foto, espécie, data e botão de abertura do relatório
 - Baseado em **Leaflet.js + OpenStreetMap** (tiles em cache offline)
 
@@ -59,6 +60,7 @@ Acacia dealbata, A. melanoxylon, A. longifolia, Hakea sericea, H. salicifolia, P
 
 - ID sequencial por análise (`#001`, `#002`…)
 - Filtros por status de saúde e período de tempo
+- Suporte a **Diagnósticos Pendentes** (capturados offline) com botão "Analisar" quando volta a rede
 - Badge roxo **⚠ INVASORA** com botão para o técnico **marcar como Removida**
 - Badge **✅ Removida** após confirmação (registo mantido para auditoria)
 - Exportação de relatório **PDF** individual ou consolidado
@@ -67,10 +69,11 @@ Acacia dealbata, A. melanoxylon, A. longifolia, Hakea sericea, H. salicifolia, P
 
 ### 📡 Offline First (PWA)
 
-- Funciona sem rede: análises guardadas localmente (IndexedDB)
-- Sincronização automática quando a ligação regressa
+- Funciona sem rede: capturas de imagem guardadas localmente (Base64) em IndexedDB
+- Diagnósticos pendentes no histórico: permite ao técnico fazer "Analisar Agora" logo que retome sinal
+- Sincronização automática para a base de dados central
 - Tiles do mapa em cache (até 500 tiles, 30 dias)
-- Instalável como aplicação nativa em iOS/Android/Desktop
+- **App 100% responsiva (Mobile First)**: suporte a iOS safe-areas, ícones nativos PWA e atalhos de ecrã principal
 
 ---
 
