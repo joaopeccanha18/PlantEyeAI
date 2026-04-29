@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   Leaf, Camera, History, Settings, Info, Activity, Zap,
-  WifiOff, Wifi, RefreshCw, Map,
+  WifiOff, Wifi, RefreshCw, Map, BarChart2,
 } from 'lucide-react';
 
 import PlantScanner from './components/PlantScanner';
@@ -12,6 +12,7 @@ import CameraSelector from './components/CameraSelector';
 import HistoryView from './components/HistoryView';
 import AuthModal from './components/AuthModal';
 import QuotaAlert from './components/QuotaAlert';
+import Estatistica from './components/estatistica';
 import SettingsModal, { translations, Language } from './components/SettingsModal';
 
 import { useHistory } from './hooks/useHistory';
@@ -27,7 +28,7 @@ import {
 
 import { AnalysisResult } from './types';
 
-type ActiveTab = 'scan' | 'live' | 'history' | 'map';
+type ActiveTab = 'scan' | 'live' | 'history' | 'map' | 'stats';
 
 function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('scan');
@@ -128,6 +129,13 @@ function App() {
         </div>
       )}
 
+      {activeTab === 'map' && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-emerald-400">
+            <Map className="w-12 h-12" />
+            <p className="text-sm font-medium">{t.mapSoon}</p>
+          </div>
+        )}
+
       <main className="max-w-2xl mx-auto px-6 py-8">
 
         {activeTab === 'scan' && (
@@ -200,6 +208,12 @@ function App() {
             <p className="text-sm font-medium">{t.mapSoon}</p>
           </div>
         )}
+
+         {/* coisa estatistica */}
+        {activeTab === 'stats' && (
+          <Estatistica history={history} />
+        )}
+
       </main>
 
       <nav className={`fixed bottom-8 left-6 right-6 backdrop-blur-xl border shadow-2xl rounded-[2.5rem] p-2 z-50 max-w-lg mx-auto transition-colors duration-300 ${darkMode ? 'bg-gray-900/80 border-gray-700/20' : 'bg-white/80 border-white/20'}`}>
@@ -209,6 +223,7 @@ function App() {
             { key: 'live', Icon: Activity, label: t.liveTab },
             { key: 'history', Icon: History, label: t.historyTab },
             { key: 'map', Icon: Map, label: t.mapTab },
+            { key: 'stats', Icon: BarChart2, label: 'Stats' },
           ] as const).map(({ key, Icon, label }) => (
             <button
               key={key}
