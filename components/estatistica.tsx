@@ -213,8 +213,8 @@ const StatsView: React.FC<StatsViewProps> = ({ history }) => {
         </div>
       </div>
 
-      {/* Top KPI cards — 2×2 grid */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Top KPI cards — 2×2 em ambos */}
+      <div className="grid grid-cols-2 gap-3">
         <StatCard
           icon={<Layers className="w-5 h-5" />}
           label="Total Análises"
@@ -258,7 +258,7 @@ const StatsView: React.FC<StatsViewProps> = ({ history }) => {
       </div>
 
       {/* Hidratação & Luz */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         {/* Hidratação */}
         <div className="bg-white rounded-[2rem] border border-emerald-100 p-5 shadow-sm space-y-3">
           <div className="flex items-center gap-2">

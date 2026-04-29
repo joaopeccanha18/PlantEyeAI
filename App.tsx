@@ -52,9 +52,24 @@ function App() {
   const t = translations[language];
 
   const { session, loading, signIn, signUp, signOut } = useAuth();
-  const { history, addHistoryItem, clearHistory, deleteHistoryItem, markInvasiveRemoved } = useHistory(session);
+  const { history, addHistoryItem, clearHistory, deleteHistoryItem, markInvasiveRemoved, updateHistoryItem } = useHistory(session);
   const { isOnline, pendingCount, isSyncing } = useOfflineSync();
   const { quotaAlert, dismissQuotaAlert, handleGeminiError } = useQuotaAlert();
+
+  /** Re-analisa um item pendente (capturado offline) agora que há rede */
+  const handleReanalyze = useCallback(async (item: HistoryItem) => {
+    if (!item.imageBase64 || !navigator.onLine) return;
+    setIsAnalyzing(true);
+    try {
+      const { analyzePlantImage } = await import('./services/gemini');
+      const result = await analyzePlantImage(item.imageBase64);
+      await updateHistoryItem(item.id, result);
+    } catch (err) {
+      handleGeminiError(err);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [updateHistoryItem, handleGeminiError]);
 
   const handleCapture = useCallback(
     async (result: AnalysisResult, imageDataUrl: string, coords: GpsCoords | null) => {
@@ -96,42 +111,42 @@ function App() {
   }
 
   return (
-    <div className={`min-h-screen font-sans pb-24 transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-white' : 'bg-[#F8FAF8] text-[#064E3B]'}`}>
+    <div className={`min-h-[100dvh] font-sans pb-28 transition-colors duration-300 ${darkMode ? 'bg-gray-950 text-white' : 'bg-[#F8FAF8] text-[#064E3B]'}`}>
 
-      <header className={`border-b px-6 py-6 sticky top-0 z-50 transition-colors duration-300 ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-emerald-100'}`}>
-        <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`border-[3px] px-3 py-1 flex items-center justify-center gap-0.5 ${darkMode ? 'border-emerald-400' : 'border-[#064E3B]'}`}>
-              <span className={`text-3xl font-black tracking-tighter ${darkMode ? 'text-emerald-400' : 'text-[#064E3B]'}`}>PL</span>
-              <Leaf className={`w-7 h-7 fill-current transform -rotate-12 flex-shrink-0 mt-0.5 ${darkMode ? 'text-emerald-400' : 'text-[#064E3B]'}`} />
-              <span className={`text-3xl font-black tracking-tighter ${darkMode ? 'text-emerald-400' : 'text-[#064E3B]'}`}>NT</span>
+      <header className={`border-b px-4 py-3 sticky top-0 z-50 transition-colors duration-300 ${darkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-emerald-100'}`}>
+        <div className="max-w-2xl mx-auto flex items-center justify-between gap-2">
+          {/* Logo */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <div className={`border-[2.5px] px-2 py-0.5 flex items-center justify-center gap-0.5 ${darkMode ? 'border-emerald-400' : 'border-[#064E3B]'}`}>
+              <span className={`text-xl font-black tracking-tighter ${darkMode ? 'text-emerald-400' : 'text-[#064E3B]'}`}>PL</span>
+              <Leaf className={`w-5 h-5 fill-current transform -rotate-12 flex-shrink-0 ${darkMode ? 'text-emerald-400' : 'text-[#064E3B]'}`} />
+              <span className={`text-xl font-black tracking-tighter ${darkMode ? 'text-emerald-400' : 'text-[#064E3B]'}`}>NT</span>
             </div>
-            <span className={`text-3xl font-black tracking-tighter leading-none ${darkMode ? 'text-emerald-400' : 'text-[#064E3B]'}`}>EYE</span>
+            <span className={`text-xl font-black tracking-tighter leading-none ${darkMode ? 'text-emerald-400' : 'text-[#064E3B]'}`}>EYE</span>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Status + actions */}
+          <div className="flex items-center gap-1.5">
             {pendingCount > 0 && (
-              <div className="flex items-center gap-1 px-2.5 py-1 bg-amber-100 rounded-full">
-                {isSyncing ? (
-                  <RefreshCw className="w-3.5 h-3.5 text-amber-600 animate-spin" />
-                ) : (
-                  <span className="text-[10px] font-black text-amber-700">{pendingCount}⬆</span>
-                )}
+              <div className="flex items-center gap-1 px-2 py-1 bg-amber-100 rounded-full">
+                {isSyncing
+                  ? <RefreshCw className="w-3 h-3 text-amber-600 animate-spin" />
+                  : <span className="text-[10px] font-black text-amber-700">{pendingCount}⬆</span>}
               </div>
             )}
 
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-              {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-              {isOnline ? 'Online' : 'Offline'}
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black ${isOnline ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              <span className="hidden xs:inline">{isOnline ? 'Online' : 'Offline'}</span>
             </div>
 
             <CameraSelector onDeviceSelect={setSelectedDeviceId} />
 
             <button
               onClick={() => setShowSettings(true)}
-              className={`p-2.5 rounded-full transition-colors ${darkMode ? 'bg-gray-700 text-emerald-400 hover:bg-gray-600' : 'bg-emerald-50 text-[#064E3B] hover:bg-emerald-100'}`}
+              className={`p-2 rounded-full transition-colors ${darkMode ? 'bg-gray-700 text-emerald-400 hover:bg-gray-600' : 'bg-emerald-50 text-[#064E3B] hover:bg-emerald-100'}`}
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -143,14 +158,13 @@ function App() {
         </div>
       )}
 
-      {activeTab === 'map' && (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-emerald-400">
-            <Map className="w-12 h-12" />
-            <p className="text-sm font-medium">{t.mapSoon}</p>
-          </div>
-        )}
 
-      <main className="max-w-2xl mx-auto px-6 py-8">
+
+      <main className={`max-w-2xl mx-auto transition-colors duration-300 ${
+        activeTab === 'map'
+          ? 'px-0 py-0'
+          : 'px-4 sm:px-6 py-6 sm:py-8'
+      }`}>
 
         {activeTab === 'scan' && (
           <div className="space-y-8">
@@ -170,18 +184,18 @@ function App() {
               onGeminiError={handleGeminiError}
             />
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className={`p-6 rounded-[2rem] border shadow-sm ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-emerald-100'}`}>
-                <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center mb-4">
-                  <Info className="w-5 h-5 text-emerald-600" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className={`p-5 rounded-[2rem] border shadow-sm ${darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-emerald-100'}`}>
+                <div className="w-9 h-9 bg-emerald-50 rounded-2xl flex items-center justify-center mb-3">
+                  <Info className="w-4 h-4 text-emerald-600" />
                 </div>
                 <h3 className="font-bold text-sm mb-1">{t.offlineMode}</h3>
                 <p className={`text-xs leading-relaxed ${darkMode ? 'text-gray-400' : 'text-emerald-700/70'}`}>{t.offlineTip}</p>
               </div>
 
-              <div className="bg-[#064E3B] p-6 rounded-[2rem] shadow-lg text-white">
-                <div className="w-10 h-10 bg-white/10 rounded-2xl flex items-center justify-center mb-4">
-                  <Zap className="w-5 h-5 text-emerald-300" />
+              <div className="bg-[#064E3B] p-5 rounded-[2rem] shadow-lg text-white">
+                <div className="w-9 h-9 bg-white/10 rounded-2xl flex items-center justify-center mb-3">
+                  <Zap className="w-4 h-4 text-emerald-300" />
                 </div>
                 <h3 className="font-bold text-sm mb-1 text-emerald-50">{t.gpsAuto}</h3>
                 <p className="text-xs text-emerald-100/70 leading-relaxed">{t.gpsTip}</p>
@@ -214,11 +228,15 @@ function App() {
             onClearHistory={clearHistory}
             onDeleteItem={deleteHistoryItem}
             onMarkRemoved={markInvasiveRemoved}
+            onReanalyze={handleReanalyze}
+            isOnline={isOnline}
           />
         )}
 
         {activeTab === 'map' && (
-          <MapView history={history} onSelectItem={handleMapSelectItem} />
+          <div className="h-[calc(100dvh-8rem)] overflow-hidden">
+            <MapView history={history} onSelectItem={handleMapSelectItem} />
+          </div>
         )}
 
          {/* coisa estatistica */}
@@ -228,26 +246,29 @@ function App() {
 
       </main>
 
-      <nav className={`fixed bottom-8 left-6 right-6 backdrop-blur-xl border shadow-2xl rounded-[2.5rem] p-2 z-50 max-w-lg mx-auto transition-colors duration-300 ${darkMode ? 'bg-gray-900/80 border-gray-700/20' : 'bg-white/80 border-white/20'}`}>
-        <div className="flex justify-between items-center">
+      {/* Nav Bottom — fixo com safe-area para iOS */}
+      <nav className={`fixed bottom-0 left-0 right-0 z-50 transition-colors duration-300
+        ${ darkMode ? 'bg-gray-900/95 border-gray-700/40' : 'bg-white/95 border-emerald-100/60'}
+        border-t backdrop-blur-xl pb-safe`}>
+        <div className="max-w-lg mx-auto flex justify-around items-center px-2 pt-1 pb-2">
           {([
-            { key: 'scan', Icon: Camera, label: t.diagnosisTab },
-            { key: 'live', Icon: Activity, label: t.liveTab },
-            { key: 'history', Icon: History, label: t.historyTab },
-            { key: 'map', Icon: Map, label: t.mapTab },
-            { key: 'stats', Icon: BarChart2, label: 'Stats' },
+            { key: 'scan',    Icon: Camera,   label: t.diagnosisTab },
+            { key: 'live',    Icon: Activity, label: t.liveTab },
+            { key: 'history', Icon: History,  label: t.historyTab },
+            { key: 'map',     Icon: Map,      label: t.mapTab },
+            { key: 'stats',   Icon: BarChart2,label: 'Stats' },
           ] as const).map(({ key, Icon, label }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
-              className={`flex-1 flex flex-col items-center py-3 rounded-[2rem] transition-all duration-300 ${
+              className={`flex flex-col items-center py-2 px-3 rounded-2xl transition-all duration-200 min-w-0 flex-1 ${
                 activeTab === key
-                  ? 'bg-[#064E3B] text-white shadow-lg scale-105'
+                  ? 'bg-[#064E3B] text-white shadow-md scale-105'
                   : darkMode ? 'text-gray-500 hover:text-emerald-400' : 'text-emerald-800/40 hover:text-emerald-600'
               }`}
             >
-              <Icon className="w-5 h-5 mb-1" />
-              <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+              <Icon className="w-5 h-5 mb-0.5" />
+              <span className="text-[9px] font-black uppercase tracking-widest truncate w-full text-center">{label}</span>
             </button>
           ))}
         </div>

@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { MapPin, Loader2, AlertTriangle, Navigation } from 'lucide-react';
 import { analyzePlantImage } from '../services/gemini';
-import { AnalysisResult, PlantStatus, GpsCoords } from '../types';
+import { AnalysisResult, PlantStatus, LightLevel, GpsCoords } from '../types';
 
 interface PlantScannerProps {
   onResult: (result: AnalysisResult, image: string, coords: GpsCoords | null) => void;
@@ -19,6 +19,7 @@ const PlantScanner: React.FC<PlantScannerProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [offlineSaved, setOfflineSaved] = useState(false);
   const [gpsState, setGpsState] = useState<GpsState>('acquiring');
   const [coords, setCoords] = useState<GpsCoords | null>(null);
 
@@ -85,6 +86,7 @@ const PlantScanner: React.FC<PlantScannerProps> = ({
 
     setIsAnalyzing(true);
     setError(null);
+    setOfflineSaved(false);
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -97,6 +99,34 @@ const PlantScanner: React.FC<PlantScannerProps> = ({
       const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
       const base64 = dataUrl.split(',')[1];
 
+      // ── MODO OFFLINE ─────────────────────────────────────────
+      if (!navigator.onLine) {
+        const pendingResult: AnalysisResult = {
+          species: 'Diagnóstico Pendente',
+          status:  PlantStatus.UNKNOWN,
+          healthStatus:    'Desconhecido' as AnalysisResult['healthStatus'],
+          threatDetected:  'nenhuma',
+          severityLevel:   0,
+          forestryRisk:    'Baixo',
+          recommendations: ['Imagem guardada localmente. Pressione "Analisar" quando voltar online.'],
+          recommendation:  '',
+          raizReference:   '',
+          summary:         'Captura offline. GPS registado. Analise quando tiver ligação à internet.',
+          lightLevel:      LightLevel.UNKNOWN,
+          confidence:      0,
+          isInvasive:      false,
+          invasiveSpecies: null,
+          isPending:       true,
+          imageBase64:     base64,
+        };
+        onResult(pendingResult, dataUrl, coords);
+        setOfflineSaved(true);
+        setTimeout(() => setOfflineSaved(false), 4000);
+        setIsAnalyzing(false);
+        return;
+      }
+
+      // ── MODO ONLINE ──────────────────────────────────────────
       try {
         const result = await analyzePlantImage(base64);
         onResult(result, dataUrl, coords);
@@ -180,6 +210,13 @@ const PlantScanner: React.FC<PlantScannerProps> = ({
 
       {/* Controlos inferiores */}
       <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center px-6 gap-4">
+        {/* Banners de feedback */}
+        {offlineSaved && (
+          <div className="bg-amber-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xl flex items-center gap-2">
+            <span>📥</span>
+            <span>Guardado offline — analise quando voltar online</span>
+          </div>
+        )}
         {error && (
           <div className="bg-red-500 text-white px-4 py-2 rounded-xl text-xs font-bold animate-bounce shadow-xl">
             {error}

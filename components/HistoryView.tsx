@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { History, Trash2, ChevronRight, Leaf, Filter, FileDown, X } from 'lucide-react';
+import { History, Trash2, ChevronRight, Leaf, Filter, FileDown, X, RefreshCw } from 'lucide-react';
 import { HistoryItem, PlantStatus } from '../types';
 import AnalysisResultView from './AnalysisResultView';
 import { exportSinglePDF, exportAllPDF } from './PDFReport';
@@ -9,13 +9,16 @@ interface HistoryViewProps {
   onClearHistory: () => void;
   onDeleteItem: (id: string) => void;
   onMarkRemoved: (id: string) => void;
+  onReanalyze: (item: HistoryItem) => Promise<void>;
+  isOnline: boolean;
 }
 
 type StatusFilter = 'ALL' | PlantStatus;
 type DateFilter = 'ALL' | 'TODAY' | 'WEEK' | 'MONTH';
 
-const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDeleteItem, onMarkRemoved }) => {
+const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDeleteItem, onMarkRemoved, onReanalyze, isOnline }) => {
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
+  const [reanalyzingId, setReanalyzingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
   const [showFilters, setShowFilters] = useState(false);
@@ -220,6 +223,10 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
                     #{String(item.analysisId ?? 0).padStart(3, '0')}
                   </span>
                   {item.coords && <span className="text-[9px] text-emerald-400/50 font-medium">📍 GPS</span>}
+                  {/* Badge Pendente (offline) */}
+                  {item.isPending && (
+                    <span className="text-[9px] font-black text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full">📥 Pendente</span>
+                  )}
                   {/* Badge Invasora */}
                   {item.isInvasive && !item.removedAt && (
                     <span className="text-[9px] font-black text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded-full">⚠ INVASORA</span>
@@ -227,7 +234,7 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
                   {item.isInvasive && item.removedAt && (
                     <span className="text-[9px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">✅ Removida</span>
                   )}
-                  {!item.isInvasive && item.threatDetected && item.threatDetected !== 'nenhuma' && (
+                  {!item.isInvasive && !item.isPending && item.threatDetected && item.threatDetected !== 'nenhuma' && (
                     <span className="text-[9px] font-bold text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded-full">
                       🐛 {item.severityLevel !== undefined ? `Nv.${item.severityLevel} ` : ''}{item.threatDetected.replace('_', ' ')}
                     </span>
@@ -240,6 +247,25 @@ const HistoryView: React.FC<HistoryViewProps> = ({ history, onClearHistory, onDe
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Botão "Analisar Agora" — só para pendentes e quando online */}
+                {item.isPending && isOnline && (
+                  <button
+                    onClick={async e => {
+                      e.stopPropagation();
+                      setReanalyzingId(item.id);
+                      await onReanalyze(item);
+                      setReanalyzingId(null);
+                    }}
+                    disabled={reanalyzingId === item.id}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed text-[9px] font-black uppercase tracking-widest"
+                    title="Analisar imagem agora"
+                  >
+                    {reanalyzingId === item.id
+                      ? <RefreshCw className="w-3 h-3 animate-spin" />
+                      : <RefreshCw className="w-3 h-3" />}
+                    <span>{reanalyzingId === item.id ? 'A analisar…' : 'Analisar'}</span>
+                  </button>
+                )}
                 {/* Botão "Marcar como Removida" — só para invasoras não removidas */}
                 {item.isInvasive && !item.removedAt && (
                   <button

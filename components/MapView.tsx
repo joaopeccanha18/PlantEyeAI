@@ -181,17 +181,17 @@ const MapView: React.FC<MapViewProps> = ({ history, onSelectItem }) => {
 
   if (itemsWithCoords.length === 0) {
     return (
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-black tracking-tight text-[#064E3B]">Mapa de Campo</h2>
+      <div className="flex flex-col h-full">
+        <div className="px-4 py-4">
+          <h2 className="text-xl font-black tracking-tight text-[#064E3B]">Mapa de Campo</h2>
           <p className="text-xs text-emerald-600/50 font-medium mt-0.5">Distribuição geoespacial dos diagnósticos</p>
         </div>
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[3rem] border border-dashed border-emerald-200 gap-4">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
           <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center">
             <MapPin className="w-8 h-8 text-emerald-200" />
           </div>
           <p className="text-emerald-900 font-bold">Sem diagnósticos no mapa</p>
-          <p className="text-emerald-600/70 text-sm text-center px-8 leading-relaxed">
+          <p className="text-emerald-600/70 text-sm text-center leading-relaxed">
             Faz diagnósticos no campo com o GPS ativo e os pins vão aparecer aqui automaticamente.
           </p>
         </div>
@@ -200,16 +200,17 @@ const MapView: React.FC<MapViewProps> = ({ history, onSelectItem }) => {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-black tracking-tight text-[#064E3B]">Mapa de Campo</h2>
-          <p className="text-xs text-emerald-600/50 font-medium mt-0.5">
-            {itemsWithCoords.length} diagnóstico{itemsWithCoords.length !== 1 ? 's' : ''} com localização GPS
+    <div className="relative h-full flex flex-col">
+      {/* Header overlay sobre o mapa */}
+      <div className="absolute top-0 left-0 right-0 z-[400] flex items-start justify-between px-4 pt-3 pointer-events-none">
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-3 py-2 shadow-sm">
+          <p className="text-[10px] font-black uppercase tracking-widest text-[#064E3B]">Mapa de Campo</p>
+          <p className="text-[9px] text-emerald-600/60">
+            {itemsWithCoords.length} pin{itemsWithCoords.length !== 1 ? 's' : ''} GPS
           </p>
         </div>
-        {/* Legenda */}
-        <div className="flex flex-col gap-1">
+        {/* Legenda compacta */}
+        <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-3 py-2 shadow-sm flex flex-col gap-1">
           {[
             STATUS_CONFIG.HEALTHY,
             STATUS_CONFIG.THIRSTY,
@@ -217,7 +218,7 @@ const MapView: React.FC<MapViewProps> = ({ history, onSelectItem }) => {
             STATUS_CONFIG.INVASIVE,
             STATUS_CONFIG.REMOVED,
           ].map((cfg) => (
-            <div key={cfg.label} className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-700/60">
+            <div key={cfg.label} className="flex items-center gap-1 text-[9px] font-bold text-emerald-700/70">
               <span>{cfg.emoji}</span>
               <span>{cfg.label}</span>
             </div>
@@ -225,15 +226,12 @@ const MapView: React.FC<MapViewProps> = ({ history, onSelectItem }) => {
         </div>
       </div>
 
+      {/* Mapa full-height */}
       <div
         ref={containerRef}
-        className="w-full rounded-[2rem] overflow-hidden shadow-lg border border-emerald-100"
-        style={{ height: '60vh', minHeight: 340 }}
+        className="flex-1 w-full"
+        style={{ touchAction: 'none', minHeight: 300 }}
       />
-
-      <p className="text-center text-[10px] text-emerald-500/50 font-medium">
-        Clica num pin para ver os detalhes do diagnóstico
-      </p>
     </div>
   );
 };

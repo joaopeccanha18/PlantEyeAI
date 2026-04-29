@@ -197,5 +197,69 @@ export function useHistory(session: Session | null) {
     }
   }, [session]);
 
-  return { history, addHistoryItem, clearHistory, deleteHistoryItem, markInvasiveRemoved, refetch: fetchHistory };
+  /**
+   * Substitui um item pendente (offline) pelos dados reais da análise.
+   * Chamado quando o técnico pressiona "Analisar Agora" após voltar online.
+   */
+  const updateHistoryItem = useCallback(async (id: string, result: AnalysisResult) => {
+    let updatedItem: HistoryItem | null = null;
+
+    setHistory(prev => {
+      const updated = prev.map(item => {
+        if (item.id !== id) return item;
+        updatedItem = {
+          ...item,
+          ...result,
+          isPending: false,
+          imageBase64: undefined, // liberta memória após análise
+        };
+        return updatedItem!;
+      });
+      writeLocalHistory(updated);
+      return updated;
+    });
+
+    // Sincroniza no Supabase
+    if (session && navigator.onLine && updatedItem) {
+      const u = updatedItem as HistoryItem;
+      try {
+        const row = {
+          species:          u.species,
+          status:           u.status,
+          health_status:    u.healthStatus,
+          threat_detected:  u.threatDetected,
+          severity_level:   u.severityLevel,
+          forestry_risk:    u.forestryRisk,
+          recommendations:  u.recommendations,
+          raiz_reference:   u.raizReference,
+          light_level:      u.lightLevel,
+          summary:          u.summary,
+          recommendation:   u.recommendations?.[0] ?? '',
+          confidence:       u.confidence,
+          is_invasive:      u.isInvasive ?? false,
+          invasive_species: u.invasiveSpecies ?? null,
+        };
+
+        if (u.id.startsWith('local_')) {
+          // Nunca foi para o Supabase — faz insert
+          await supabase.from('scan_history').insert({
+            ...row,
+            user_id:     session.user.id,
+            analysis_id: u.analysisId,
+            timestamp:   u.timestamp,
+            image_url:   u.imageUrl,
+            latitude:    u.coords?.latitude ?? null,
+            longitude:   u.coords?.longitude ?? null,
+          });
+        } else {
+          // Já existe — faz update
+          await supabase.from('scan_history').update(row).eq('id', u.id);
+        }
+      } catch {
+        // Falhou — fica guardado localmente
+      }
+    }
+  }, [session]);
+
+  return { history, addHistoryItem, clearHistory, deleteHistoryItem, markInvasiveRemoved, updateHistoryItem, refetch: fetchHistory };
 }

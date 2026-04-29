@@ -115,6 +115,10 @@ export interface AnalysisResult extends EucalyptusAnalysis {
   status: PlantStatus;
   /** @deprecated Usa recommendations[0] em vez disto */
   recommendation: string;
+  /** true = capturado offline, análise IA ainda não realizada */
+  isPending?: boolean;
+  /** Base64 da imagem guardada para re-análise quando online */
+  imageBase64?: string;
 }
 
 // ── HistoryItem ──────────────────────────────────────────────
@@ -130,6 +134,10 @@ export interface HistoryItem extends AnalysisResult {
   isLegacy?:  boolean;
   /** true = o técnico confirmou que removeu a invasora */
   removedAt?: number | null;
+  /** true = capturado offline, aguarda re-análise online */
+  isPending?: boolean;
+  /** Base64 da imagem original guardada para re-análise */
+  imageBase64?: string;
 }
 
 export interface VoiceState {
